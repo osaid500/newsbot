@@ -8,7 +8,7 @@ const PASS = process.env.PASS_KEY;
 const ROOMID = process.env.ROOM_ID;
 
 const SSL = true; // server uses https ?
-const ROOMS = ["Dar-AlArqam"];
+const ROOMS = [process.env.ROOM_NAME];
 
 const TelegramBot = require("node-telegram-bot-api");
 
@@ -17,11 +17,20 @@ const token = process.env.TOKEN_KEY;
 
 const bot = new TelegramBot(token, { polling: true });
 
-// DETECT ANY MESSAGE IN TELEGRAM
-bot.on("message", (msg) => {
+function callBot(msg) {
   const chatId = msg.chat.id;
   sendMessage(msg);
-  bot.sendMessage(chatId, "Received your message");
+  bot.sendMessage(chatId, "Sending your message to Rocket.Chat");
+}
+
+// DETECT ANY MESSAGE IN TELEGRAM GROUPS
+bot.on("message", (msg) => {
+  callBot(msg);
+});
+
+// DETECT ANY MESSAGE IN TELEGRAM CHANNELS
+bot.on("channel_post", (msg) => {
+  callBot(msg);
 });
 
 var myuserid;
@@ -37,15 +46,58 @@ const runbot = async () => {
 
 async function sendMessage(msg) {
   // SENDING MESSAGE
+  console.log("sending message");
+  console.log(msg);
   if (msg.photo) {
     // MESSAGE HAS PHOTO
     let url = await bot.getFileLink(msg.photo[3].file_id);
     const sentMsg = await driver.sendMessage({
       msg: msg.caption,
       rid: ROOMID,
+      file: {
+        type: "mp4,",
+      },
       attachments: [
         {
           image_url: url,
+        },
+      ],
+    });
+  } else if (msg.video) {
+    // MESSAGE HAS VIDEO
+    let videoUrl = await bot.getFileLink(msg.video.file_id);
+    let fileName = videoUrl.slice(87);
+    const sentMsg = await driver.sendMessage({
+      msg: msg.caption,
+      rid: ROOMID,
+      attachments: [
+        {
+          video_url: videoUrl,
+          thumb_url: thumbUrl,
+          title: fileName,
+        },
+      ],
+    });
+  } else if (msg.document) {
+    // MESSAGE HAS DOCUMENT
+    let fileUrl = await bot.getFileLink(msg.document.file_id);
+    let fileName = msg.document.file_name;
+    let fileType = msg.document.mime_type;
+    console.log(fileType.slice(0, -4));
+    let shrek;
+    shrek =
+      fileType === "image/jpeg"
+        ? { image_url: fileUrl }
+        : fileType === "video/mp4"
+        ? { video_url: fileUrl }
+        : { text: fileUrl };
+    const sentMsg = await driver.sendMessage({
+      msg: msg.caption,
+      rid: ROOMID,
+      attachments: [
+        {
+          ...shrek,
+          title: fileName,
         },
       ],
     });
